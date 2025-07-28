@@ -2,43 +2,50 @@
 import streamlit as st
 import pandas as pd
 
-st.title("Module 1: CSV Cleaner")
+st.set_page_config(page_title="Module 1: Load and Clean Comps", page_icon="📥")
+st.title("📥 Module 1: Load and Preview Comp Data")
 
-uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
-
+uploaded_file = st.file_uploader("Upload Comp CSV File", type=["csv"])
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
-    df.columns = df.columns.str.strip()
 
-    expected_fields = {
+    # Rename commonly used fields for internal consistency
+    rename_map = {
         "Above Grade Finished Area": "ag_sf",
         "Net Close Price": "net_price",
         "Concessions Amount": "concessions",
-        "Street Number": "street_number",
-        "Street Dir Prefix": "street_prefix",
-        "Street Name": "street_name",
-        "Street Suffix": "street_suffix",
         "Bedrooms Total": "bedrooms",
         "Bathrooms Total Integer": "bathrooms"
     }
+    df.rename(columns=rename_map, inplace=True)
 
-    df = df.rename(columns=expected_fields)
-    for field in expected_fields.values():
-        if field not in df.columns:
-            df[field] = None
+    # Combine address fields safely
+    if all(col in df.columns for col in ["Street Number", "Street Name", "Street Suffix"]):
+        df["full_address"] = (
+            df["Street Number"].astype(str).str.strip()
+            + " "
+            + df.get("Street Dir Prefix", "").fillna("").astype(str).str.strip()
+            + " "
+            + df["Street Name"].astype(str).str.strip()
+            + " "
+            + df["Street Suffix"].astype(str).str.strip()
+        ).str.replace("  ", " ").str.strip()
+    else:
+        st.warning("Some address components are missing. 'full_address' will not be generated.")
+        df["full_address"] = "Unknown"
 
-    df["address"] = df["street_number"].astype(str) + " " + df["street_prefix"].fillna("") + " " + df["street_name"] + " " + df["street_suffix"]
-    df["address"] = df["address"].str.strip()
-    
+    # Drop rows with missing critical values
+    required_fields = ["ag_sf", "net_price", "bedrooms", "bathrooms"]
+    initial_count = len(df)
+    df.dropna(subset=required_fields, inplace=True)
+    removed = initial_count - len(df)
 
-    def is_row_valid(row):
-        return all(pd.notna(row[col]) and str(row[col]).strip() != '' for col in ["ag_sf", "net_price", "street_number", "street_name", "street_suffix"])
+    if removed > 0:
+        st.info(f"{removed} comps removed due to missing critical fields.")
 
-    df["valid"] = df.apply(is_row_valid, axis=1)
+    df.sort_values(by="net_price", inplace=True)
+    st.dataframe(df)
 
-    excluded = df[~df["valid"]]
-    clean_df = df[df["valid"]].sort_values(by="net_price")
-
-    st.success(f"{len(clean_df)} comps loaded successfully. {len(excluded)} excluded due to missing required data.")
-    st.dataframe(clean_df)
-    st.session_state.cleaned_comp_data = clean_df
+    # Save to session
+    st.session_state.cleaned_comp_data = df
+    st.success("Comp data loaded and cleaned successfully.")
