@@ -29,6 +29,7 @@ if uploaded_file:
 
     df["address"] = df["street_number"].astype(str) + " " + df["street_prefix"].fillna("") + " " + df["street_name"] + " " + df["street_suffix"]
     df["address"] = df["address"].str.strip()
+    
 
     def is_row_valid(row):
         return all(pd.notna(row[col]) and str(row[col]).strip() != '' for col in ["ag_sf", "net_price", "street_number", "street_name", "street_suffix"])
@@ -40,3 +41,4 @@ if uploaded_file:
 
     st.success(f"{len(clean_df)} comps loaded successfully. {len(excluded)} excluded due to missing required data.")
     st.dataframe(clean_df)
+    st.session_state.cleaned_comp_data = clean_df
