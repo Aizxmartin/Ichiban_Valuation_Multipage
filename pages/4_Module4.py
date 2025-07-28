@@ -22,7 +22,7 @@ filtered_df = df[
     (df["ag_sf"] >= lower_bound) & (df["ag_sf"] <= upper_bound)
 ]
 
-st.session_state.filtered_comps = filtered_df  # Save to state for next module
+st.session_state['filtered_comps_df'] = filtered_df   # Save to state for next module
 
 # Display result
 st.success(f"{len(filtered_df)} comps match the filtering range ({lower_bound:.0f} - {upper_bound:.0f} SF).")
