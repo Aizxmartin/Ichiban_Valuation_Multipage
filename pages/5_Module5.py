@@ -33,4 +33,4 @@ comps["adjusted_price"] = comps["net_price"] + comps["ag_adj"]
 st.dataframe(comps[["full_address", "ag_sf", "net_price", "ag_diff", "ag_adj", "adjusted_price"]])
 
 # Save for next module
-st.session_state.adjusted_comps = comps
+st.session_state.get("filtered_comps_df") = comps
