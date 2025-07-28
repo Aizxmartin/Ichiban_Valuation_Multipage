@@ -6,7 +6,7 @@ st.set_page_config(page_title="Module 5: Apply Comp Adjustments", layout="wide")
 st.title("📐 Module 5: Comp Adjustments Using Schema")
 
 # Ensure required data exists
-if "filtered_comps" not in st.session_state or "subject_data" not in st.session_state:
+if "filtered_comps_df" not in st.session_state or "subject_data" not in st.session_state:
     st.error("❌ Missing filtered comps or subject data. Please complete Modules 1–4.")
     st.stop()
 
@@ -18,8 +18,8 @@ except FileNotFoundError:
     st.error("Please upload 'market_adjustment_schema.json' in this directory.")
     st.stop()
 
-comps = st.session_state.filtered_comps.copy()
-subject = st.session_state.subject_data
+comps = st.session_state["filtered_comps_df"].copy()
+subject = st.session_state["subject_data"]
 
 # Above Grade SF adjustment
 rate = schema.get("above_grade_adjustment", 40)
@@ -33,4 +33,4 @@ comps["adjusted_price"] = comps["net_price"] + comps["ag_adj"]
 st.dataframe(comps[["full_address", "ag_sf", "net_price", "ag_diff", "ag_adj", "adjusted_price"]])
 
 # Save for next module
-st.session_state.get("filtered_comps_df") = comps
+st.session_state["adjusted_comps"] = comps
