@@ -1,9 +1,9 @@
-
 import streamlit as st
 import fitz  # PyMuPDF
 import re
 
-st.title("Module 2: Subject Property Extractor")
+st.set_page_config(page_title="Module 2: Subject Property", page_icon="🏠")
+st.title("🏠 Module 2: Subject Property Details")
 
 def extract_text_from_pdf(pdf_file):
     text = ""
@@ -17,9 +17,6 @@ def parse_subject_data(text):
     match = re.search(r"(\d{3,5}\s+\w+\s+\w+\s+(St|Ave|Blvd|Rd|Dr).+)", text)
     if match:
         data["address"] = match.group(1).strip()
-    avm_match = re.search(r"(Estimated Value|AVM)[^\d$]*\$([\d,]+)", text)
-    if avm_match:
-        data["real_avm"] = int(avm_match.group(2).replace(",", ""))
     sf_match = re.search(r"(Finished Area|Bldg Sq Ft)[^\d]*(\d{3,5})", text)
     if sf_match:
         data["ag_sf"] = int(sf_match.group(2))
@@ -38,12 +35,13 @@ if uploaded_pdf:
     text = extract_text_from_pdf(uploaded_pdf)
     parsed = parse_subject_data(text)
 
-    st.subheader("Extracted Data:")
+    st.subheader("Review or Manually Complete Extracted Info:")
     subject_data["address"] = parsed.get("address", st.text_input("Address", ""))
-    subject_data["real_avm"] = parsed.get("real_avm", st.number_input("Real AVM", min_value=0))
     subject_data["ag_sf"] = parsed.get("ag_sf", st.number_input("Above Grade SF", min_value=0))
     subject_data["bedrooms"] = parsed.get("bedrooms", st.number_input("Bedrooms", min_value=0, step=1))
     subject_data["bathrooms"] = parsed.get("bathrooms", st.number_input("Bathrooms", min_value=0, step=1))
 
-    st.success("Subject Property Data Collected")
+    st.session_state['subject_data'] = subject_data
+
+    st.success("Subject Property Data Saved to Session")
     st.json(subject_data)
