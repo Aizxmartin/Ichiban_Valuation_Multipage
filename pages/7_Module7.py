@@ -3,55 +3,50 @@ import streamlit as st
 import pandas as pd
 import json
 
-st.set_page_config(page_title="Module 7: Basement Adjustments", page_icon="🏗️")
-st.title("🏗️ Module 7: Basement Adjustments")
+st.set_page_config(page_title="Module 7: Basement Adjustments", layout="wide")
+st.title("🏗️ Module 7: Apply Basement Adjustments")
 
-# Confirm necessary inputs exist
-if "adjusted_comps" not in st.session_state or "subject_data" not in st.session_state:
-    st.error("❌ Missing adjusted comps or subject data. Complete prior modules.")
+if "adjusted_comps" not in st.session_state:
+    st.error("❌ Missing comps from Module 5. Please complete prior steps.")
     st.stop()
 
-# Load schema for basement adjustments
+df = st.session_state.adjusted_comps.copy()
+subject = st.session_state.subject_data
 try:
     with open("market_adjustment_schema.json", "r") as f:
         schema = json.load(f)
 except FileNotFoundError:
-    st.error("Schema file missing: market_adjustment_schema.json")
+    st.error("Missing 'market_adjustment_schema.json' file.")
     st.stop()
 
-df = st.session_state["adjusted_comps"].copy()
-subject = st.session_state["subject_data"]
+# Get adjustment rates
+rate_bgf = schema.get("below_grade_finished_adjustment", 25)
+rate_bgu = schema.get("below_grade_unfinished_adjustment", 10)
 
-# Extract subject basement info (assume 0 if not present)
-subject_bgf = subject.get("below_grade_finished", 0)
-subject_bgu = subject.get("below_grade_unfinished", 0)
+# Safely handle basement data
+if "below_grade_finished" in df.columns:
+    df["bgf"] = df["below_grade_finished"].fillna(0)
+else:
+    df["bgf"] = 0
 
-# Schema rates
-bgf_rate = schema.get("below_grade_finished_adjustment", 30)
-bgu_rate = schema.get("below_grade_unfinished_adjustment", 15)
+if "below_grade_unfinished" in df.columns:
+    df["bgu"] = df["below_grade_unfinished"].fillna(0)
+else:
+    df["bgu"] = 0
 
-# Default fill
-df["bgf"] = df.get("below_grade_finished", 0).fillna(0)
-df["bgu"] = df.get("below_grade_unfinished", 0).fillna(0)
+# Apply basement adjustments
+df["basement_adj"] = (df["bgf"] * rate_bgf) + (df["bgu"] * rate_bgu)
 
-# Calculate differences
-df["bgf_diff"] = df["bgf"] - subject_bgf
-df["bgu_diff"] = df["bgu"] - subject_bgu
+# Combine with previous AG adjustments
+if "ag_adj" not in df.columns:
+    df["ag_adj"] = 0
 
-# Apply adjustments
-df["bgf_adj"] = df["bgf_diff"] * bgf_rate
-df["bgu_adj"] = df["bgu_diff"] * bgu_rate
-
-# Combine adjustments
-df["total_adjustments"] = df.get("ag_adj", 0) + df["bgf_adj"] + df["bgu_adj"]
+df["total_adjustments"] = df["ag_adj"] + df["basement_adj"]
 df["adjusted_price"] = df["net_price"] + df["total_adjustments"]
 
-# Display breakdown
-st.subheader("🔍 Basement Adjustments Applied")
-st.dataframe(df[[
-    "full_address", "ag_sf", "net_price", "ag_adj",
-    "bgf", "bgu", "bgf_adj", "bgu_adj", "total_adjustments", "adjusted_price"
-]])
+# Save updated comps
+st.session_state.adjusted_comps = df
 
-# Save for next module
-st.session_state["adjusted_comps"] = df
+# Display
+st.success("✅ Basement adjustments applied.")
+st.dataframe(df[["full_address", "ag_sf", "bgf", "bgu", "net_price", "ag_adj", "basement_adj", "total_adjustments", "adjusted_price"]])
