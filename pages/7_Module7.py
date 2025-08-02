@@ -1,52 +1,39 @@
 
 import streamlit as st
 import pandas as pd
-import json
 
 st.set_page_config(page_title="Module 7: Basement Adjustments", layout="wide")
-st.title("🏗️ Module 7: Apply Basement Adjustments")
+st.title("🏗️ Module 7: Adjust for Basement Differences")
 
-if "adjusted_comps" not in st.session_state:
-    st.error("❌ Missing comps from Module 5. Please complete prior steps.")
+# Ensure previous data is available
+if "adjusted_comps" not in st.session_state or "subject_data" not in st.session_state:
+    st.error("❌ Missing data. Please run Module 5 and Module 2 first.")
     st.stop()
 
-df = st.session_state.adjusted_comps.copy()
-subject = st.session_state.subject_data
-try:
-    with open("market_adjustment_schema.json", "r") as f:
-        schema = json.load(f)
-except FileNotFoundError:
-    st.error("Missing 'market_adjustment_schema.json' file.")
-    st.stop()
+df = st.session_state["adjusted_comps"].copy()
+subject = st.session_state["subject_data"]
 
-# Get adjustment rates
-rate_bgf = schema.get("below_grade_finished_adjustment", 25)
-rate_bgu = schema.get("below_grade_unfinished_adjustment", 10)
+# Calculate subject basement areas
+subject_bgf = subject.get("below_grade_finished", 0)
+subject_bgu = subject.get("below_grade_unfinished", 0)
 
-# Safely handle basement data
-if "below_grade_finished" in df.columns:
-    df["bgf"] = df["below_grade_finished"].fillna(0)
-else:
-    df["bgf"] = 0
+# Load values for adjustments
+bgf_rate = 20  # Finished basement adjustment rate
+bgu_rate = 10  # Unfinished basement adjustment rate
 
-if "below_grade_unfinished" in df.columns:
-    df["bgu"] = df["below_grade_unfinished"].fillna(0)
-else:
-    df["bgu"] = 0
+# Calculate differences and adjustments
+df["bgf_diff"] = df.get("below_grade_finished", 0).fillna(0) - subject_bgf
+df["bgu_diff"] = df.get("below_grade_unfinished", 0).fillna(0) - subject_bgu
 
-# Apply basement adjustments
-df["basement_adj"] = (df["bgf"] * rate_bgf) + (df["bgu"] * rate_bgu)
+df["bgf_adj"] = df["bgf_diff"] * bgf_rate
+df["bgu_adj"] = df["bgu_diff"] * bgu_rate
 
-# Combine with previous AG adjustments
-if "ag_adj" not in df.columns:
-    df["ag_adj"] = 0
-
-df["total_adjustments"] = df["ag_adj"] + df["basement_adj"]
+# Recalculate adjusted price
+df["total_adjustments"] = df.get("ag_adj", 0) + df["bgf_adj"] + df["bgu_adj"]
 df["adjusted_price"] = df["net_price"] + df["total_adjustments"]
 
-# Save updated comps
-st.session_state.adjusted_comps = df
+# Store updated comps
+st.session_state["adjusted_comps"] = df
 
-# Display
-st.success("✅ Basement adjustments applied.")
-st.dataframe(df[["full_address", "ag_sf", "bgf", "bgu", "net_price", "ag_adj", "basement_adj", "total_adjustments", "adjusted_price"]])
+# Display result
+st.dataframe(df[["full_address", "ag_sf", "net_price", "ag_adj", "bgf_adj", "bgu_adj", "total_adjustments", "adjusted_price"]])
