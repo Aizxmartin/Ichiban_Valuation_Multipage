@@ -3,60 +3,55 @@ import streamlit as st
 import pandas as pd
 import json
 
-st.set_page_config(page_title="Module 7: Basement Adjustments", layout="wide")
+st.set_page_config(page_title="Module 7: Basement Adjustments", page_icon="🏗️")
 st.title("🏗️ Module 7: Basement Adjustments")
 
-# Ensure prior modules completed
+# Confirm necessary inputs exist
 if "adjusted_comps" not in st.session_state or "subject_data" not in st.session_state:
-    st.error("❌ Missing adjusted comps or subject data. Please complete prior modules.")
+    st.error("❌ Missing adjusted comps or subject data. Complete prior modules.")
     st.stop()
 
-# Load schema
+# Load schema for basement adjustments
 try:
     with open("market_adjustment_schema.json", "r") as f:
         schema = json.load(f)
 except FileNotFoundError:
-    st.error("Please upload 'market_adjustment_schema.json' in this directory.")
+    st.error("Schema file missing: market_adjustment_schema.json")
     st.stop()
 
-comps = st.session_state["adjusted_comps"].copy()
+df = st.session_state["adjusted_comps"].copy()
 subject = st.session_state["subject_data"]
 
-# Fallbacks if not defined
-subject_finished = subject.get("below_grade_finished_sf", 0)
-subject_unfinished = subject.get("below_grade_unfinished_sf", 0)
+# Extract subject basement info (assume 0 if not present)
+subject_bgf = subject.get("below_grade_finished", 0)
+subject_bgu = subject.get("below_grade_unfinished", 0)
 
-# Ensure comps have needed columns
-required_cols = ["Below Grade Finished Area", "Below Grade Unfinished Area"]
-for col in required_cols:
-    if col not in comps.columns:
-        st.error(f"❌ Missing required field in comps: '{col}'")
-        st.stop()
+# Schema rates
+bgf_rate = schema.get("below_grade_finished_adjustment", 30)
+bgu_rate = schema.get("below_grade_unfinished_adjustment", 15)
 
-# Rename for ease
-comps["bg_finished"] = pd.to_numeric(comps["Below Grade Finished Area"], errors="coerce").fillna(0)
-comps["bg_unfinished"] = pd.to_numeric(comps["Below Grade Unfinished Area"], errors="coerce").fillna(0)
+# Default fill
+df["bgf"] = df.get("below_grade_finished", 0).fillna(0)
+df["bgu"] = df.get("below_grade_unfinished", 0).fillna(0)
 
-# Differences from subject
-comps["bgf_diff"] = comps["bg_finished"] - subject_finished
-comps["bgu_diff"] = comps["bg_unfinished"] - subject_unfinished
+# Calculate differences
+df["bgf_diff"] = df["bgf"] - subject_bgf
+df["bgu_diff"] = df["bgu"] - subject_bgu
 
 # Apply adjustments
-rate_finished = schema.get("below_grade_finished_adjustment", 30)
-rate_unfinished = schema.get("below_grade_unfinished_adjustment", 15)
+df["bgf_adj"] = df["bgf_diff"] * bgf_rate
+df["bgu_adj"] = df["bgu_diff"] * bgu_rate
 
-comps["bgf_adj"] = comps["bgf_diff"] * rate_finished
-comps["bgu_adj"] = comps["bgu_diff"] * rate_unfinished
+# Combine adjustments
+df["total_adjustments"] = df.get("ag_adj", 0) + df["bgf_adj"] + df["bgu_adj"]
+df["adjusted_price"] = df["net_price"] + df["total_adjustments"]
 
-# Update final price
-comps["adjusted_price"] += comps["bgf_adj"] + comps["bgu_adj"]
-
-# Save
-st.session_state["adjusted_comps"] = comps
-
-# Display
-st.subheader("🏠 Adjusted for Basement Differences")
-st.dataframe(comps[[
-    "full_address", "ag_sf", "net_price", "adjusted_price", 
-    "bg_finished", "bg_unfinished", "bgf_adj", "bgu_adj"
+# Display breakdown
+st.subheader("🔍 Basement Adjustments Applied")
+st.dataframe(df[[
+    "full_address", "ag_sf", "net_price", "ag_adj",
+    "bgf", "bgu", "bgf_adj", "bgu_adj", "total_adjustments", "adjusted_price"
 ]])
+
+# Save for next module
+st.session_state["adjusted_comps"] = df
