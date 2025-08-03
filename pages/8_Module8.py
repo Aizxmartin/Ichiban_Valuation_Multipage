@@ -1,66 +1,69 @@
-
 import streamlit as st
 import pandas as pd
+import json
 
-st.set_page_config(page_title="Module 8: Enhanced Market Valuation Summary", layout="wide")
+st.set_page_config(page_title="Module 8: Enhanced Market Valuation Summary Report", layout="wide")
 st.title("📊 Module 8: Enhanced Market Valuation Summary Report")
 
-# Check required session state
-if "subject_data" not in st.session_state or "adjusted_comps" not in st.session_state or "online_avg" not in st.session_state:
-    st.error("❌ Missing required data. Please complete Modules 1–7 first.")
+# Check session state for required data
+required_keys = ["adjusted_comps", "subject_data", "online_avg"]
+missing = [key for key in required_keys if key not in st.session_state]
+if missing:
+    st.error(f"❌ Missing required data: {', '.join(missing)}. Please complete prior modules.")
     st.stop()
 
-subject = st.session_state.subject_data
-comps = st.session_state.adjusted_comps.copy()
-online_avg = st.session_state.online_avg
+comps = st.session_state["adjusted_comps"].copy()
+subject_data = st.session_state["subject_data"]
+online_avg = st.session_state["online_avg"]
 
-# Calculate average PPSF
-ppsf_avg = round(comps["adjusted_price"].sum() / comps["ag_sf"].sum(), 2)
+# Summary stats
+min_price = comps["adjusted_price"].min()
+max_price = comps["adjusted_price"].max()
+avg_ppsf = round(comps["adjusted_price"].sum() / comps["ag_sf"].sum(), 2)
+avg_days_in_mls = comps["days_in_mls"].mean() if "days_in_mls" in comps.columns else None
 
-# Calculate avg days in MLS if available
-if "Days in MLS" in comps.columns:
-    try:
-        comps["Days in MLS"] = pd.to_numeric(comps["Days in MLS"], errors="coerce")
-        avg_days = int(comps["Days in MLS"].mean())
-        st.session_state["avg_days_in_mls"] = avg_days
-    except:
-        avg_days = "N/A"
-else:
-    avg_days = "N/A"
-
-# Display summary
+# Display Summary
 st.subheader("🏠 Subject Property")
-st.markdown(f"**Address**: {subject.get('address', 'N/A')}")
-st.markdown(f"**Above Grade SF**: {subject.get('ag_sf', 'N/A')} | **Bedrooms**: {subject.get('bedrooms', 'N/A')} | **Bathrooms**: {subject.get('bathrooms', 'N/A')}")
+st.markdown(f"**Address:** {subject_data.get('address', 'N/A')}")
+st.markdown(f"**Above Grade SF:** {subject_data.get('ag_sf', 'N/A')} | **Bedrooms:** {subject_data.get('bedrooms', 'N/A')} | **Bathrooms:** {subject_data.get('bathrooms', 'N/A')}")
 
 st.subheader("📊 Valuation Summary")
-st.markdown(f"**Online Estimate Average**: ${online_avg:,.0f}")
-st.markdown(f"**Adjusted Comp Range**: ${comps['adjusted_price'].min():,.0f}–${comps['adjusted_price'].max():,.0f}")
-st.markdown(f"**Average Price per SF**: ${ppsf_avg}")
-st.markdown(f"**Average Days in MLS**: {avg_days}")
+st.markdown(f"**Online Estimate Average:** ${online_avg:,.0f}")
+st.markdown(f"**Adjusted Comp Range:** {min_price:,.0f}–{max_price:,.0f}")
+st.markdown(f"**Average Price per SF:** ${avg_ppsf:,.2f}")
+st.markdown(f"**Average Days in MLS:** {round(avg_days_in_mls, 1) if avg_days_in_mls is not None else 'N/A'}")
 
+# Show comps table
 st.subheader("🏘️ Adjusted Comparable Sales")
-display_cols = ["full_address", "ag_sf", "net_price", "ag_adj", "bgf_adj", "bgu_adj", "total_adjustments", "adjusted_price"]
-if "Public Remarks" in comps.columns:
-    display_cols.append("Public Remarks")
+cols_to_show = ["full_address", "ag_sf", "net_price", "ag_adj", "bgf_adj", "bgu_adj", "total_adjustments", "adjusted_price", "days_in_mls", "public_remarks"]
+cols_existing = [col for col in cols_to_show if col in comps.columns]
+st.dataframe(comps[cols_existing])
 
-st.dataframe(comps[display_cols], use_container_width=True)
-
-# Export summary to JSON for GPT review
-export = {
-    "subject_property": subject,
-    "online_avg": online_avg,
-    "adjusted_range": {
-        "low": comps["adjusted_price"].min(),
-        "high": comps["adjusted_price"].max()
-    },
-    "average_ppsf": ppsf_avg,
-    "average_days_in_mls": avg_days,
-    "comps": comps[display_cols].to_dict(orient="records")
+# Save JSON summary
+summary = {
+    "subject_property": subject_data,
+    "online_estimate_average": online_avg,
+    "adjusted_price_range": [min_price, max_price],
+    "average_ppsf": avg_ppsf,
+    "average_days_in_mls": round(avg_days_in_mls, 1) if avg_days_in_mls is not None else None,
+    "comps": comps.to_dict(orient="records")
 }
 
-import json
-with open("module8_summary.json", "w") as f:
-    json.dump(export, f, indent=2)
+json_path = "module8_summary.json"
+with open(json_path, "w") as f:
+    json.dump(summary, f, indent=2)
 
-st.success("✅ Summary JSON saved as 'module8_summary.json'")
+st.success(f"✅ Summary JSON saved as '{json_path}'")
+
+# --- ✅ Add download button ---
+with open(json_path, "rb") as f:
+    st.download_button(
+        label="📥 Download Module 8 Summary JSON",
+        data=f,
+        file_name="module8_summary.json",
+        mime="application/json"
+    )
+
+# (Optional) Preview JSON structure
+with st.expander("📄 Preview JSON Summary"):
+    st.json(summary)
