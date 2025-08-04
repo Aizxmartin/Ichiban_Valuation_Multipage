@@ -1,72 +1,49 @@
 import streamlit as st
+import openai
 import json
 from pathlib import Path
-import openai
-import os
 
 st.set_page_config(page_title="Module 9: GPT Review", layout="wide")
-st.title("🧠 Module 9: GPT Review & Market Summary Generator")
+st.title("🧠 Module 9: GPT Review & Market Report Generator")
 
-# Load JSON summary from Module 8
 json_path = Path("module8_summary.json")
 if not json_path.exists():
-    st.error("module8_summary.json not found. Please complete Module 8 first.")
+    st.error("❌ Could not find 'module8_summary.json'. Please run Module 8 first.")
     st.stop()
 
 with open(json_path, "r") as f:
     summary_data = json.load(f)
 
-# Construct prompt
-subject = summary_data["subject_property"]
-comps = summary_data["comps"]
-remarks = [c.get("public_remarks", "") for c in comps if c.get("public_remarks")]
-days_list = [c.get("days_in_mls") for c in comps if isinstance(c.get("days_in_mls"), (int, float))]
+# GPT review prompt
+system_prompt = "You are a real estate valuation expert."
+user_prompt = f"""
+Please analyze this market valuation summary and provide insights:
+1. Review pricing consistency.
+2. Identify any large comp value outliers.
+3. Analyze average Days in MLS.
+4. Summarize notable remarks from comps.
+5. Flag inconsistencies or suggested notes.
+6. Confirm if the price range is reasonable or should shift up/down.
 
-prompt = f"""
-You are an expert real estate valuation analyst. Review the following market data and provide a clear assessment with:
-1. Price consistency analysis and outlier detection
-2. Days in MLS commentary
-3. Summary of notable remarks
-4. Your opinion on pricing confidence (stay, increase, or decrease)
-
-Subject Property:
-- Address: {subject["address"]}
-- Above Grade SF: {subject["above_grade_sf"]}
-- Bedrooms: {subject["bedrooms"]}
-- Bathrooms: {subject["bathrooms"]}
-
-Online Estimate Average: ${summary_data["online_estimate_average"]:,}
-Adjusted Price Range: {summary_data["adjusted_price_range"]}
-Average PPSF: ${summary_data["average_ppsf"]}
-
-Average Days in MLS: {round(sum(days_list)/len(days_list), 1) if days_list else "N/A"}
-
-Public Remarks:
-{chr(10).join(remarks)}
+JSON Summary:
+{json.dumps(summary_data)}
 """
 
-st.subheader("AI Market Review Summary")
-if "openai_api_key" not in st.secrets:
-    st.error("Please set your OpenAI API key in Streamlit secrets.")
-    st.stop()
+with st.spinner("Running GPT analysis..."):
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+    )
 
-openai.api_key = st.secrets["openai_api_key"]
+gpt_review = response.choices[0].message.content
+st.subheader("📋 GPT Market Commentary")
+st.markdown(gpt_review)
 
-response = openai.ChatCompletion.create(
-    model="gpt-4",
-    messages=[
-        {"role": "system", "content": "You are a real estate valuation expert."},
-        {"role": "user", "content": prompt}
-    ],
-    temperature=0.7
-)
+# Save result for next module
+with open("gpt_review.txt", "w") as f:
+    f.write(gpt_review)
 
-analysis = response.choices[0].message.content.strip()
-st.text_area("GPT Review Output", analysis, height=300)
-
-# Save new analysis file
-summary_data["gpt_review"] = analysis
-with open("module9_analysis.json", "w") as f:
-    json.dump(summary_data, f, indent=2)
-
-st.success("✅ Enhanced analysis saved to 'module9_analysis.json'")
+st.success("✅ GPT analysis saved to gpt_review.txt")
