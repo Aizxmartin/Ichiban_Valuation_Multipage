@@ -33,7 +33,9 @@ doc.add_paragraph(data.get("gpt_review", "No commentary available."))
 doc.add_heading("Adjusted Comparable Sales", level=1)
 table = doc.add_table(rows=1, cols=8)
 hdr_cells = table.rows[0].cells
-hdr_cells[:] = ["Address", "AG SF", "Net Price", "AG Adj", "BGF Adj", "BGU Adj", "Total Adj", "Adjusted Price"]
+headers = ["Address", "AG SF", "Net Price", "AG Adj", "BGF Adj", "BGU Adj", "Total Adj", "Adjusted Price"]
+for i, header in enumerate(headers):
+    hdr_cells[i].text = header
 
 for c in data["comps"]:
     row = table.add_row().cells

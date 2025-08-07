@@ -34,14 +34,15 @@ summary = {
     "gpt_review": "• Adjusted comps show consistent market conditions.\n• Subject property appears well-positioned within the pricing range.\n• Average Days in MLS indicates moderate demand."
 }
 
-# Safe JSON serialization fix
-def convert_to_native(obj):
-    if isinstance(obj, (np.integer, np.int64)):
+def convert_all(obj):
+    if isinstance(obj, dict):
+        return {k: convert_all(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_all(item) for item in obj]
+    elif isinstance(obj, (np.integer, np.int64)):
         return int(obj)
     elif isinstance(obj, (np.floating, np.float64)):
         return float(obj)
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
     elif isinstance(obj, pd.DataFrame):
         return obj.to_dict(orient="records")
     elif isinstance(obj, pd.Series):
@@ -49,7 +50,7 @@ def convert_to_native(obj):
     return obj
 
 with open("module9_analysis.json", "w") as f:
-    json.dump(summary, f, indent=2, default=convert_to_native)
+    json.dump(convert_all(summary), f, indent=2)
 
 st.success("✅ Summary saved as 'module9_analysis.json'")
 st.json(summary)
