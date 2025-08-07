@@ -1,5 +1,7 @@
 import streamlit as st
 import json
+import numpy as np
+import pandas as pd
 
 st.set_page_config(page_title="Module 8: Final Summary", page_icon="📊")
 st.title("📊 Module 8: Final Valuation Summary")
@@ -32,8 +34,22 @@ summary = {
     "gpt_review": "• Adjusted comps show consistent market conditions.\n• Subject property appears well-positioned within the pricing range.\n• Average Days in MLS indicates moderate demand."
 }
 
+# Safe JSON serialization fix
+def convert_to_native(obj):
+    if isinstance(obj, (np.integer, np.int64)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64)):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, pd.DataFrame):
+        return obj.to_dict(orient="records")
+    elif isinstance(obj, pd.Series):
+        return obj.tolist()
+    return obj
+
 with open("module9_analysis.json", "w") as f:
-    json.dump(summary, f, indent=2)
+    json.dump(summary, f, indent=2, default=convert_to_native)
 
 st.success("✅ Summary saved as 'module9_analysis.json'")
 st.json(summary)
